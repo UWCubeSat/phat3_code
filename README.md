@@ -2,7 +2,7 @@
 
 This code will run on the
 [Heltec ESP32 LoRA V3](https://docs.heltec.org/en/node/esp32/wifi_lora_32/index.html) (915 MHz) aboard the
-[PHAT-3 mainboard](https://github.com/BanBot-2/PHAT-3-Main-Board).
+[PHAT-3 mainboard](https://github.com/UWCubeSat/PHAT-3-Main-Board).
 
 It will transmit data from PCB-mounted sensors over LoRA, and save them to a micro SD card.
 
