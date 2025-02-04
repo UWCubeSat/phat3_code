@@ -1,0 +1,2 @@
+# Custom ESP-IDF settings.
+# ESP-IDF uses defaults, except for the settings specified here.
