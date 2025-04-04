@@ -1,4 +1,4 @@
-# PHAT3-Software
+# phat3_code
 
 This Arduino code will run on the
 [Heltec ESP32 LoRA V3](https://docs.heltec.org/en/node/esp32/wifi_lora_32/index.html) (915 MHz) aboard the
