@@ -4,6 +4,10 @@
 #include <esp_check.h>
 #include <i2c.h>
 #include <sd_card.h>
+#include <ucam.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <esp_task.h>
 
 
 #define LOG_TAG "main"
@@ -11,11 +15,40 @@
 
 void app_main(void)
 {
-    int sd_fd;
-    ESP_ERROR_CHECK(init_sd_card(&sd_fd));
-
-
+    char sd_path[64];
+    ESP_ERROR_CHECK(sd_card_mount(sd_path, sizeof(sd_path)));
     
+    char log_path[64];
+    int res = snprintf(log_path, sizeof(log_path), "%s/log.txt", sd_path);
+    if (res == -1 || res >= sizeof(log_path)) {
+        abort();
+    }
+
+    ESP_LOGI(LOG_TAG, "PATH: %s", log_path);
+
+    FILE* logfile = fopen(log_path, "w");
+
+    char text[] = "Hello world!\n";
+    fwrite(text, sizeof(text) - 1, 1, logfile);
+    fclose(logfile);
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    uint8_t* jpg;
+    uint32_t jpg_len;
+
+    ESP_ERROR_CHECK(ucam_get_photo(&jpg, &jpg_len));
+
+    char img_path[64];
+    res = snprintf(img_path, sizeof(img_path), "%s/img.jpg", sd_path);
+    if (res == -1 || res >= sizeof(img_path)) {
+        abort();
+    }
+    FILE* imgfile = fopen(img_path, "w");
+    fwrite(jpg, jpg_len, 1, imgfile);
+    fclose(imgfile);
+
+    ESP_ERROR_CHECK(sd_card_unmount());
 }
 
 

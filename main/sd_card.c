@@ -7,6 +7,7 @@
 #include <sdmmc_cmd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <string.h>
 
 #define LOG_TAG "sd_card"
 
@@ -15,13 +16,13 @@
 #define GPIO_CLK 33
 #define GPIO_CS 48
 
-esp_err_t init_sd_card(int* ret_fd) {
+static sdmmc_card_t* card;
+
+esp_err_t sd_card_mount(char* ret_dir_path, size_t ret_dir_path_size) {
     esp_err_t ret;
 
-    const char mount_point[] = "/sdcard";
-
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
-    host.slot = SPI1_HOST;
+    host.slot = SPI2_HOST;
 
     spi_bus_config_t bus_cfg = {
         .mosi_io_num = GPIO_MOSI,
@@ -29,7 +30,7 @@ esp_err_t init_sd_card(int* ret_fd) {
         .sclk_io_num = GPIO_CLK,
     };
 
-    ret = spi_bus_initialize(host.slot, &bus_cfg, SDSPI_DEFAULT_DMA);
+    ret = spi_bus_initialize(host.slot, &bus_cfg, SPI_DMA_CH_AUTO);
     ESP_RETURN_ON_ERROR(ret, LOG_TAG, "Couldn't initialize SPI bus.");
 
     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
@@ -42,35 +43,33 @@ esp_err_t init_sd_card(int* ret_fd) {
     };
 
     // This function call uses all the configuration created above.
-    sdmmc_card_t* card;
-    ret = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
+    ret = esp_vfs_fat_sdspi_mount("/sdcard", &host, &slot_config, &mount_config, &card);
     ESP_RETURN_ON_ERROR(ret, LOG_TAG, "Couldn't mount SD card file system.");
 
     // Display SD Card info
     ESP_LOGI(LOG_TAG, "SD Card info: ");
     sdmmc_card_print_info(stdout, card);
 
-    // Create a file at an unused path
-    char path[64];
-    *ret_fd = -1;
-    for (int filenum = 0; filenum < 100; filenum++) {
-        snprintf(path, sizeof(path), "/sdcard/flight_log_%d.txt", filenum);
-
-        *ret_fd = open("/sdcard/myfile.txt", O_CREAT | O_EXCL | O_WRONLY, 0666);
-        if (*ret_fd == -1) {
-            if (errno == EEXIST) {
-                continue;
-            } else {
-                ESP_LOGE(LOG_TAG, "Couldn't open ");
-                return ESP_FAIL;
-            }
+    // Create a new unused folder
+    for (int foldernum = 0; foldernum < 100; foldernum++) {
+        int res = snprintf(ret_dir_path, ret_dir_path_size, "/sdcard/flight_%d/", foldernum);
+        if (res == -1 || res >= ret_dir_path_size) {
+            return ESP_ERR_NO_MEM;
+        }
+        res = mkdir(ret_dir_path, 0777);
+        if (res == 0) {
+            return ESP_OK;
+        } else if (errno == EEXIST) {
+            continue;
+        } else {
+            return ESP_FAIL;
         }
     }
 
-    if (*ret_fd == -1) {
-        ESP_LOGE(LOG_TAG, "All 100 possible SD file names taken!");
-        return ESP_FAIL;
-    }
+    ESP_LOGE(LOG_TAG, "All 100 possible SD directory names taken!");
+    return ESP_FAIL;
+}
 
-    return ESP_OK;
+esp_err_t sd_card_unmount(void) {
+    return esp_vfs_fat_sdcard_unmount("/sdcard", card);
 }
