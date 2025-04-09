@@ -1,6 +1,5 @@
 #pragma once
 #include <driver/i2c_master.h>
-#include <esp_err.h>
 
 #define I2C_TIMEOUT 1000
 

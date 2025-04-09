@@ -1,7 +1,5 @@
 #pragma once
 
-#include <esp_err.h>
-
 // Creates a new, unused, empty directory on the SD card, and
 // returns the path to it.
 //

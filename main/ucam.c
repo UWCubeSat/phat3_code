@@ -92,8 +92,6 @@ esp_err_t ucam_get_photo(uint8_t** ret_jpg, uint32_t* ret_jpg_size) {
         ESP_RETURN_ON_ERROR(ret, LOG_TAG, "Couldn't configure UART GPIO pins");
     }
 
-    ESP_LOGI(LOG_TAG, "Commencing start!");
-
     // Wake up the camera (according to documentation)
     for (int retries = 0; retries < 60; retries++) {
         ret = send_cmd(CMD_SYNC, retries + 5);
