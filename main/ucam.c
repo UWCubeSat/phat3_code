@@ -1,3 +1,4 @@
+#include <ucam.h>
 #include <driver/uart.h>
 #include <esp_check.h>
 #include <string.h>

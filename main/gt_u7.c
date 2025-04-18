@@ -1,3 +1,4 @@
+#include <gt_u7.h>
 #include <driver/uart.h>
 #include <esp_err.h>
 #include <esp_timer.h>
@@ -24,8 +25,6 @@
 
 esp_err_t gps_get_sample(void) {
     esp_err_t ret;
-    int res;
-    uint8_t reply[6];
 
     // Start the driver if it hasn't been already
     if (!uart_is_driver_installed(UART_NUM_2)) {
@@ -71,7 +70,7 @@ esp_err_t gps_get_sample(void) {
         ESP_LOGI(LOG_TAG, "Length of the read bytes: %d", len);
         ESP_LOGI(LOG_TAG, "Here's the string: %s", message_start);
 
-        esp_log_buffer_hex(LOG_TAG, message_start, message_end - message_start);
+        ESP_LOG_BUFFER_HEX(LOG_TAG, message_start, message_end - message_start);
         
         // Parse...
         nmea_s *data = nmea_parse(message_start, message_end - message_start, 0);

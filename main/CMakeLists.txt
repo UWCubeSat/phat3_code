@@ -5,6 +5,7 @@ idf_component_register(
         "ucam.c"
         "gt_u7.c"
         "sd_card.c"
+        "radio.c"
     INCLUDE_DIRS
         "."
 )
