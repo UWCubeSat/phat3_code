@@ -3,6 +3,7 @@
 #include <ucam.h>
 #include <gt_u7.h>
 #include <sd_card.h>
+#include <radio.h>
 
 // ESP-IDF headers
 #include <stdio.h>
@@ -18,7 +19,5 @@
 
 void app_main(void)
 {
-    ESP_ERROR_CHECK(gps_get_sample());
-
-
+    // TODO: Call the functions in our other *.h files from here!
 }
