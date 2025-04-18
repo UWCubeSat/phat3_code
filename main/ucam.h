@@ -1,3 +1,6 @@
 #pragma once
+#include <esp_err.h>
 
-esp_err_t ucam_get_photo(uint8_t** ret_jpg, uint32_t* ret_jpg_size);
+// Save a jpeg photo from the UCAM-III
+// to the given directory.
+esp_err_t ucam_save_photo(char* save_dir_path);

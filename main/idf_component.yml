@@ -15,3 +15,21 @@ dependencies:
   #   # All dependencies of `main` are public by default.
   #   public: true
   igrr/libnmea: ^0.2.1
+  esp_idf_lib_helpers:
+    git: "https://github.com/UncleRus/esp-idf-lib"
+    path: "components/esp_idf_lib_helpers"
+  i2cdev:
+    git: "https://github.com/UncleRus/esp-idf-lib"
+    path: "components/i2cdev"
+  aht:
+    git: "https://github.com/UncleRus/esp-idf-lib"
+    path: "components/aht"
+  bmp180:
+    git: "https://github.com/UncleRus/esp-idf-lib"
+    path: "components/bmp180"
+  mpu6050:
+    git: "https://github.com/UncleRus/esp-idf-lib"
+    path: "components/mpu6050"
+  scd4x:
+    git: "https://github.com/UncleRus/esp-idf-lib"
+    path: "components/scd4x"

@@ -3,13 +3,13 @@
 #include <string.h>
 #include <esp_log.h>
 #include <esp_timer.h>
+#include <errno.h>
 
 #define LOG_TAG "ucam"
 
-#define UART_BUF_SIZE (4 * UART_HW_FIFO_LEN(UART_NUM_1))
-
-#define GPIO_TX 39
-#define GPIO_RX 40
+const int UART_BUF_SIZE = (4 * UART_HW_FIFO_LEN(UART_NUM_1));
+const int GPIO_TX = 39;
+const int GPIO_RX = 40;
 
 // Documentation: https://resources.4dsystems.com.au/datasheets/accessories/uCAM-III/#command-set
 
@@ -35,11 +35,17 @@ const uint8_t CMD_GET_PIC[6] =  {0xAA, 0x04, 0x01, 0x00, 0x00, 0x00};
 // Beginning of accept response
 const uint8_t RESP_ACK[2] = {0xAA, 0x0E};
 
+// Beginning of no-accept response
 const uint8_t RESP_NAK[3] = {0xAA, 0x0F, 0x00};
 
 // Beginning of get picture response
 const uint8_t RESP_DATA[3] =  {0xAA, 0x0A, 0x01};
 
+// Image buffer
+static uint8_t jpeg_buf[32000];
+
+
+// Sends a command to the UART, and confirm acknowledgment.
 static esp_err_t send_cmd(const uint8_t cmd[6], uint32_t ms_timeout) {
     int res;
     esp_err_t ret;
@@ -69,7 +75,7 @@ static esp_err_t send_cmd(const uint8_t cmd[6], uint32_t ms_timeout) {
 }
 
 
-esp_err_t ucam_get_photo(uint8_t** ret_jpg, uint32_t* ret_jpg_size) {
+esp_err_t ucam_save_photo(char* save_dir_path) {
     esp_err_t ret;
     int res;
     uint8_t reply[6];
@@ -110,43 +116,37 @@ esp_err_t ucam_get_photo(uint8_t** ret_jpg, uint32_t* ret_jpg_size) {
     }
     res = uart_write_bytes(UART_NUM_1, ACK_SYNC, sizeof(ACK_SYNC));
     ESP_RETURN_ON_FALSE(res == 6, ESP_FAIL, LOG_TAG, "UART write failed");
-
-    // Wait for the camera to adjust exposure (according to documentation)
-    vTaskDelay(pdMS_TO_TICKS(2000));
     
+    // initialize the camera
     ret = send_cmd(CMD_INIT, 1000);
     ESP_RETURN_ON_ERROR(ret, LOG_TAG, "No ack");
-
     ret = send_cmd(CMD_PACKSIZE, 1000);
     ESP_RETURN_ON_ERROR(ret, LOG_TAG, "No ack");
 
+    // Wait for the camera to adjust exposure (according to documentation)
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    // take the picture
     ret = send_cmd(CMD_SNAPSHOT, 1000);
     ESP_RETURN_ON_ERROR(ret, LOG_TAG, "No ack");
-
     vTaskDelay(pdMS_TO_TICKS(200));
-
     ret = send_cmd(CMD_GET_PIC, 1000);
     ESP_RETURN_ON_ERROR(ret, LOG_TAG, "No ack");
 
     // Get the photo size
     res = uart_read_bytes(UART_NUM_1, reply, 6, pdMS_TO_TICKS(1000));
     ESP_RETURN_ON_FALSE(res == 6, ESP_FAIL, LOG_TAG, "Reply had incorrect size");
-
     if (memcmp(reply, RESP_DATA, sizeof(RESP_DATA)) != 0) {
         return ESP_FAIL;
     }
-    *ret_jpg_size = (uint32_t) reply[3] | ((uint32_t) reply[4] << 8) | ((uint32_t) reply[5] << 16);
-    ESP_LOGI(LOG_TAG, "Receiving image of size %ld", *ret_jpg_size);
-
-    // Receive the photo
-    *ret_jpg = (uint8_t*) malloc(*ret_jpg_size);
+    uint32_t jpeg_size = (uint32_t) reply[3] | ((uint32_t) reply[4] << 8) | ((uint32_t) reply[5] << 16);
 
     ret = uart_flush_input(UART_NUM_1);
     ESP_RETURN_ON_ERROR(ret, LOG_TAG, "Couldn't flush UART");
 
     size_t bytes_read = 0;
 
-    for (uint16_t i = 0; i < (*ret_jpg_size / (512 - 6)) + 1; i++) {
+    for (uint16_t i = 0; i < (jpeg_size / (512 - 6)) + 1; i++) {
         int res;
         esp_err_t ret;
 
@@ -166,7 +166,7 @@ esp_err_t ucam_get_photo(uint8_t** ret_jpg, uint32_t* ret_jpg_size) {
         uint16_t data_size = (uint16_t) reply[2] | ((uint16_t) reply[3] << 8);
         
         // Read image payload
-        res = uart_read_bytes(UART_NUM_1, *ret_jpg + bytes_read, data_size, pdMS_TO_TICKS(100));
+        res = uart_read_bytes(UART_NUM_1, jpeg_buf + bytes_read, data_size, pdMS_TO_TICKS(100));
         ESP_RETURN_ON_FALSE(res == data_size, ESP_FAIL, LOG_TAG, "IMG chunk read failed");
         bytes_read += res;
 
@@ -176,7 +176,33 @@ esp_err_t ucam_get_photo(uint8_t** ret_jpg, uint32_t* ret_jpg_size) {
         ESP_RETURN_ON_FALSE(reply[1] == 0, ESP_FAIL, LOG_TAG, "Expected last chunk byte to be zero");
     }
 
-    ESP_RETURN_ON_FALSE(bytes_read == *ret_jpg_size, ESP_FAIL, LOG_TAG, "Read unexpected image size");
+
+    ESP_RETURN_ON_FALSE(bytes_read == jpeg_size, ESP_FAIL, LOG_TAG, "Read unexpected image size");
+
+    // Generate a timestamped image filename
+    int64_t time = esp_timer_get_time() / 1000000;
+    char img_path[64];
+    res = snprintf(img_path, sizeof(img_path), "%s/img%llu.jpg", save_dir_path, time);
+    if (res == -1 || res >= sizeof(img_path)) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Save the image
+    FILE* imgfile = fopen(img_path, "w");
+    if (imgfile == NULL) {
+        ESP_LOGE(LOG_TAG, "Couldn't create jpg file. %s", strerror(errno));
+        return ESP_FAIL;
+    }
+    res = fwrite(jpeg_buf, jpeg_size, 1, imgfile);
+    if (res != 1) {
+        ESP_LOGE(LOG_TAG, "Couldn't write jpg to file. %s", strerror(errno));
+        return ESP_FAIL;
+    }
+    // Close (and flush) the file
+    res = fclose(imgfile);
+    if (res != 0) {
+        ESP_LOGE(LOG_TAG, "Couldn't close jpg file. %s", strerror(errno));
+    }
 
     return ESP_OK;
 }

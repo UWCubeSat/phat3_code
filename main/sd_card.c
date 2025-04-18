@@ -11,10 +11,10 @@
 
 #define LOG_TAG "sd_card"
 
-#define GPIO_MOSI 47
-#define GPIO_MISO 34
-#define GPIO_CLK 33
-#define GPIO_CS 48
+const gpio_num_t GPIO_MOSI = GPIO_NUM_47;
+const gpio_num_t GPIO_MISO = GPIO_NUM_34;
+const gpio_num_t GPIO_CLK = GPIO_NUM_33;
+const gpio_num_t GPIO_CS = GPIO_NUM_48;
 
 static sdmmc_card_t* card;
 

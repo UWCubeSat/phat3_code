@@ -3,13 +3,13 @@
 
 #define LOG_TAG "i2c"
 
-static i2c_master_bus_handle_t master_bus_handle = NULL;
+static i2c_master_bus_handle_t i2c_master_handle = NULL;
 
 esp_err_t i2c_add_device(uint16_t address_7bit, i2c_master_dev_handle_t *ret_handle) {
     esp_err_t ret;
 
     // initialize the bus if it isn't already
-    if (master_bus_handle == NULL) {
+    if (i2c_master_handle == NULL) {
         i2c_master_bus_config_t i2c_mst_config = {
             .clk_source = I2C_CLK_SRC_DEFAULT,
             .i2c_port = -1,
@@ -18,7 +18,7 @@ esp_err_t i2c_add_device(uint16_t address_7bit, i2c_master_dev_handle_t *ret_han
             .glitch_ignore_cnt = 7,
         };
     
-        ret = i2c_new_master_bus(&i2c_mst_config, &master_bus_handle);
+        ret = i2c_new_master_bus(&i2c_mst_config, &i2c_master_handle);
         ESP_RETURN_ON_ERROR(ret, LOG_TAG, "Couldn't create new master bus.");
     }
     
@@ -30,7 +30,7 @@ esp_err_t i2c_add_device(uint16_t address_7bit, i2c_master_dev_handle_t *ret_han
     };
 
     // add the device
-    ret = i2c_master_bus_add_device(master_bus_handle, &dev_cfg, ret_handle);
+    ret = i2c_master_bus_add_device(i2c_master_handle, &dev_cfg, ret_handle);
     ESP_RETURN_ON_ERROR(ret, LOG_TAG, "Couldn't add device to bus");
 
     return ESP_OK;
