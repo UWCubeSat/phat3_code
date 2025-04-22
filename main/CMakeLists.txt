@@ -6,6 +6,7 @@ idf_component_register(
         "gt_u7.c"
         "sd_card.c"
         "radio.c"
+        "sx126x_hal.c"
     INCLUDE_DIRS
         "."
 )

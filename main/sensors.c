@@ -1,6 +1,9 @@
 #include <sensors.h>
 #include <esp_check.h>
 #include <driver/i2c_master.h>
+#include <esp_timer.h>
+#include <errno.h>
+#include <string.h>
 
 #include <aht.h>
 #include <bmp180.h>
@@ -19,6 +22,9 @@ static bmp180_dev_t bmp180_dev;
 static mpu6050_dev_t mpu6050_dev;
 static i2c_dev_t scd41_dev;
 
+// Temporarily stores CSV line before
+// appended to file
+static char csv_line_buf[2048];
 
 
 esp_err_t init_sensors(void) {
@@ -62,6 +68,9 @@ esp_err_t init_sensors(void) {
 esp_err_t read_all_sensor_data(sensors_data_t* sensor_data_ret) {
     esp_err_t err;
 
+    uint64_t millis = esp_timer_get_time() / 1000;
+    sensor_data_ret->millis_since_start = millis;
+
     err = aht_get_data(
         &aht_dev,
         &(sensor_data_ret->aht21_temperature),
@@ -103,7 +112,36 @@ esp_err_t read_all_sensor_data(sensors_data_t* sensor_data_ret) {
     return ESP_OK;
 }
 
-esp_err_t save_sensor_data_csv(const sensors_data_t* sensor_data, FILE* data_csv) {
-    // todo: implement this!
-    return ESP_FAIL;
+esp_err_t save_sensor_data_csv(const sensors_data_t* sensor_data, const char* csv_path) {
+    int res;
+
+    res = snprintf(
+        csv_line_buf, sizeof(csv_line_buf), CSV_FMT_LINE,
+        SENSOR_DATA_EXPAND(*sensor_data));
+
+    if (res == -1 || res >= sizeof(csv_line_buf)) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    FILE* file = fopen(csv_path, "a");
+    if (file == NULL) {
+        ESP_LOGE(LOG_TAG, "Couldn't append to CSV file. %s", strerror(errno));
+        return ESP_FAIL;
+    }
+
+    // If we just created this file, write the header
+    if (ftell(file) == 0) {
+        res = fwrite(CSV_HEADER_LINE, sizeof(CSV_HEADER_LINE) - 1, 1, file);
+        ESP_RETURN_ON_FALSE(res == 1, ESP_FAIL, LOG_TAG, "CSV file err: %s", strerror(errno));
+    }
+
+    // Write the line to the file
+    res = fwrite(csv_line_buf, res, 1, file);
+    ESP_RETURN_ON_FALSE(res == 1, ESP_FAIL, LOG_TAG, "CSV file err: %s", strerror(errno));
+
+    return ESP_OK;
+}
+
+void log_sensor_data(const sensors_data_t* sensor_data) {
+    ESP_LOGI(LOG_TAG, PRETTY_FMT_LINE, SENSOR_DATA_EXPAND(*sensor_data));
 }
