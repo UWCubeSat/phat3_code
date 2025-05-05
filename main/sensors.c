@@ -10,6 +10,8 @@
 #include <mpu6050.h>
 #include <scd4x.h>
 
+#include <gt_u7.h>
+
 // Tag used for logging
 #define LOG_TAG "sensors"
 
@@ -109,6 +111,17 @@ esp_err_t read_all_sensor_data(sensors_data_t* sensor_data_ret) {
     );
     ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
 
+    gt_u7_data_t gps_data;
+    err = gt_u7_get_location(&gps_data);
+    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
+    sensor_data_ret->gps_latitude = gps_data.gps_latitude;
+    sensor_data_ret->gps_longitude = gps_data.gps_longitude;
+    strncpy(
+        sensor_data_ret->gps_timestamp,
+        gps_data.gps_timestamp,
+        sizeof(sensor_data_ret->gps_timestamp)
+    );
+
     return ESP_OK;
 }
 
@@ -138,6 +151,9 @@ esp_err_t save_sensor_data_csv(const sensors_data_t* sensor_data, const char* cs
     // Write the line to the file
     res = fwrite(csv_line_buf, res, 1, file);
     ESP_RETURN_ON_FALSE(res == 1, ESP_FAIL, LOG_TAG, "CSV file err: %s", strerror(errno));
+
+    res = fclose(file);
+    ESP_RETURN_ON_FALSE(res == 0, ESP_FAIL, LOG_TAG, "CSV file err: %s", strerror(errno));
 
     return ESP_OK;
 }

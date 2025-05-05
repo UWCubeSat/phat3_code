@@ -7,17 +7,24 @@ typedef struct {
     uint64_t millis_since_start;
     float aht21_temperature;
     float aht21_humidity;
+    
     float bmp180_temperature;
     uint32_t bmp180_pressure;
+    
     float mpu6050_accel_x;
     float mpu6050_accel_y;
     float mpu6050_accel_z;
     float mpu6050_rot_x;
     float mpu6050_rot_y;
     float mpu6050_rot_z;
+    
     uint16_t scd41_co2;
     float scd41_temperature;
     float scd41_humidity;
+
+    double gps_latitude;
+    double gps_longitude;
+    char gps_timestamp[30];
 } sensors_data_t;
 
 // Header at the top of sensor CSV file
@@ -27,7 +34,8 @@ const char CSV_HEADER_LINE[] =
 "bmp180_temperature, bmp180_pressure, "
 "mpu6050_accel_x, mpu6050_accel_y, mpu6050_accel_z, "
 "mpu6050_rot_x, mpu6050_rot_y, mpu6050_rot_z, "
-"scd41_co2, scd41_temperature, scd41_humidity\n";
+"scd41_co2, scd41_temperature, scd41_humidity, "
+"gps_latitude, gps_longitude, gps_timestamp\n";
 
 // Helper-macro for passing in sensor_data fields
 // to format functions.
@@ -45,7 +53,10 @@ const char CSV_HEADER_LINE[] =
 (sensor_data).mpu6050_rot_z, \
 (sensor_data).scd41_co2, \
 (sensor_data).scd41_temperature, \
-(sensor_data).scd41_humidity
+(sensor_data).scd41_humidity,\
+(sensor_data).gps_latitude, \
+(sensor_data).gps_longitude, \
+(sensor_data).gps_timestamp
 
 // CSV file data line format string
 #define CSV_FMT_LINE \
@@ -54,7 +65,8 @@ const char CSV_HEADER_LINE[] =
 "%.9g, %" PRIu32 ", " \
 "%.9g, %.9g, %.9g, " \
 "%.9g, %.9g, %.9g, " \
-"%" PRIu16 ", %.9g, %.9g\n"
+"%" PRIu16 ", %.9g, %.9g, " \
+"%.10g, %.10g, %s\n"
 
 // Format string for pretty-printing
 #define PRETTY_FMT_LINE \
@@ -73,6 +85,9 @@ const char CSV_HEADER_LINE[] =
 "scd41_co2: %" PRIu16 "\n" \
 "scd41_temperature: %.9g\n" \
 "scd41_humidity: %.9g\n" \
+"gps_latitude: %.9g\n" \
+"gps_longitude: %.9g\n" \
+"gps_timestamp: %s\n" \
 "---------------------\n"
 
 // Initializes all the sensors on the PHAT-3 board.
