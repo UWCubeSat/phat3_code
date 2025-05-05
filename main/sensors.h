@@ -91,16 +91,16 @@ const char CSV_HEADER_LINE[] =
 "---------------------\n"
 
 // Initializes all the sensors on the PHAT-3 board.
-esp_err_t init_sensors(void);
+esp_err_t sensors_init(void);
 
 // Reads all data from all sensors.
 //
 // Must wait at least 5 seconds between calls.
-esp_err_t read_all_sensor_data(sensors_data_t* sensor_data_ret);
+esp_err_t sensors_read(sensors_data_t* sensor_data_ret);
 
 // Appends a line containing `sensor_data` to the file called `csv_path`.
 // If there's no file called `csv_path`, creates one, and adds the proper CSV header.
-esp_err_t save_sensor_data_csv(const sensors_data_t* sensor_data, const char* csv_path);
+esp_err_t sensors_save_to_csv(const sensors_data_t* sensor_data, const char* csv_path);
 
 // Pretty-prints `sensor_data` using `ESP_LOGI`.
-void log_sensor_data(const sensors_data_t* sensor_data);
+void sensors_log_data(const sensors_data_t* sensor_data);
