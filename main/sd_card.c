@@ -52,7 +52,7 @@ esp_err_t sd_card_mount(char* ret_dir_path, size_t ret_dir_path_size) {
     sdmmc_card_print_info(stdout, card);
 
     // Create a new unused folder
-    for (int foldernum = 0; foldernum < 100; foldernum++) {
+    for (int foldernum = 0; foldernum < 1000; foldernum++) { // TODO: change back to 1000
         int res = snprintf(ret_dir_path, ret_dir_path_size, "/sdcard/flight_%d/", foldernum);
         if (res == -1 || res >= ret_dir_path_size) {
             return ESP_ERR_NO_MEM;

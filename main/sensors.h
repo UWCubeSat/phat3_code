@@ -28,14 +28,14 @@ typedef struct {
 } sensors_data_t;
 
 // Header at the top of sensor CSV file
-const char CSV_HEADER_LINE[] = 
-"millis_since_start, "
-"aht21_temperature, aht21_humidity, "
-"bmp180_temperature, bmp180_pressure, "
-"mpu6050_accel_x, mpu6050_accel_y, mpu6050_accel_z, "
-"mpu6050_rot_x, mpu6050_rot_y, mpu6050_rot_z, "
-"scd41_co2, scd41_temperature, scd41_humidity, "
-"gps_latitude, gps_longitude, gps_timestamp\n";
+#define CSV_HEADER_LINE \
+"millis_since_start, " \
+"aht21_temperature, aht21_humidity, " \
+"bmp180_temperature, bmp180_pressure, " \
+"mpu6050_accel_x, mpu6050_accel_y, mpu6050_accel_z, " \
+"mpu6050_rot_x, mpu6050_rot_y, mpu6050_rot_z, " \
+"scd41_co2, scd41_temperature, scd41_humidity, " \
+"gps_latitude, gps_longitude, gps_timestamp\n"
 
 // Helper-macro for passing in sensor_data fields
 // to format functions.

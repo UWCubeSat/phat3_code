@@ -32,7 +32,29 @@ static char csv_line_buf[2048];
 esp_err_t sensors_init(void) {
     esp_err_t err;
 
-    err = aht_init_desc(&aht_dev, AHT_I2C_ADDRESS_VCC, I2C_PORT, SDA, SCL);
+    // // Initialize the I2C driver
+    // i2c_config_t i2c_conf = {
+    //     .mode = I2C_MODE_MASTER,
+    //     .sda_io_num = SDA,
+    //     .scl_io_num = SCL,
+    //     .sda_pullup_en = GPIO_PULLUP_ENABLE,
+    //     .scl_pullup_en = GPIO_PULLUP_ENABLE,
+    //     .master.clk_speed = 10 * 1000,
+    //     .clk_flags = 0,  // use default
+    // };
+
+    // err = i2c_param_config(I2C_PORT, &i2c_conf);
+    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init I2C driver");
+
+    // err = i2c_driver_install(I2C_PORT, i2c_conf.mode, 0, 0, 0);
+    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init I2C driver");
+
+    err = i2cdev_init();
+    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init I2C library");
+
+    // Initialize the sensors
+
+    err = aht_init_desc(&aht_dev, AHT_I2C_ADDRESS_GND, I2C_PORT, SDA, SCL);
     ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
     err = aht_init(&aht_dev);
     ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
@@ -41,8 +63,6 @@ esp_err_t sensors_init(void) {
     err = aht_get_status(&aht_dev, &is_busy, &is_calibrated);
     ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
     ESP_RETURN_ON_FALSE(is_busy == false, ESP_FAIL, LOG_TAG, "Couldn't init sensor");
-    ESP_RETURN_ON_FALSE(is_busy == true, ESP_FAIL, LOG_TAG, "Couldn't init sensor");
-
 
     err = bmp180_init_desc(&bmp180_dev, I2C_PORT, SDA, SCL);
     ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
@@ -57,12 +77,14 @@ esp_err_t sensors_init(void) {
     // TODO: Add more mpu6050 initialization/calibration?
     // TODO: Add mpu6050 averaging or quicker polling?
 
+    // TODO: Get the CO2 sensor to work below.
 
-    err = scd4x_init_desc(&scd41_dev, I2C_PORT, SDA, SCL);
-    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
-    err = scd4x_start_periodic_measurement(&scd41_dev);
-    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
-    // TODO: calibrate?
+    // err = scd4x_init_desc(&scd41_dev, I2C_PORT, SDA, SCL);
+    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
+    // vTaskDelay(pdMS_TO_TICKS(1000)); // TODO: is this needed?
+    // err = scd4x_start_periodic_measurement(&scd41_dev);
+    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
+    // // TODO: calibrate?
 
     return ESP_OK;
 }
@@ -103,24 +125,24 @@ esp_err_t sensors_read(sensors_data_t* sensor_data_ret) {
     sensor_data_ret->mpu6050_rot_y = mpu6050_rot.y;
     sensor_data_ret->mpu6050_rot_z = mpu6050_rot.z;
 
-    err = scd4x_read_measurement(
-        &scd41_dev,
-        &(sensor_data_ret->scd41_co2),
-        &(sensor_data_ret->scd41_temperature),
-        &(sensor_data_ret->scd41_humidity)
-    );
-    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
+    // err = scd4x_read_measurement(
+    //     &scd41_dev,
+    //     &(sensor_data_ret->scd41_co2),
+    //     &(sensor_data_ret->scd41_temperature),
+    //     &(sensor_data_ret->scd41_humidity)
+    // );
+    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
 
-    gt_u7_data_t gps_data;
-    err = gt_u7_get_location(&gps_data);
-    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
-    sensor_data_ret->gps_latitude = gps_data.gps_latitude;
-    sensor_data_ret->gps_longitude = gps_data.gps_longitude;
-    strncpy(
-        sensor_data_ret->gps_timestamp,
-        gps_data.gps_timestamp,
-        sizeof(sensor_data_ret->gps_timestamp)
-    );
+    // gt_u7_data_t gps_data;
+    // err = gt_u7_get_location(&gps_data);
+    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
+    // sensor_data_ret->gps_latitude = gps_data.gps_latitude;
+    // sensor_data_ret->gps_longitude = gps_data.gps_longitude;
+    // strncpy(
+    //     sensor_data_ret->gps_timestamp,
+    //     gps_data.gps_timestamp,
+    //     sizeof(sensor_data_ret->gps_timestamp)
+    // );
 
     return ESP_OK;
 }

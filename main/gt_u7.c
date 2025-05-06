@@ -31,7 +31,7 @@ static char read_buf[256];
 
 // Fills `read_buf` with the next NMEA sentence string
 static esp_err_t read_next_nmea_sentence(void) {
-    // Get to the start of the next sentence
+    // Get to the start of the next sentence (marked by the dollar sign)
     read_buf[0] = '\0';
     while (read_buf[0] != '$') {
         int len = uart_read_bytes(UART_NUM_2, &read_buf, 1, pdMS_TO_TICKS(2000));
@@ -39,10 +39,24 @@ static esp_err_t read_next_nmea_sentence(void) {
     }
 
     int bytes_read = 1;
-    while (read_buf[bytes_read - 1] != '\n') {
+
+    // Read the rest of the sentence
+
+    while (true) {
         int len = uart_read_bytes(UART_NUM_2, read_buf + bytes_read, 1, pdMS_TO_TICKS(2000));
         ESP_RETURN_ON_FALSE(len == 1, ESP_ERR_TIMEOUT, LOG_TAG, "Timed out reading from GPS");
-        bytes_read += 1;
+
+        // Check for line terminator (either \n or \r\n)
+        if (read_buf[bytes_read] == '\n') {
+            // Handle \r\n line terminator if we are reading \n after \r
+            if (bytes_read > 0 && read_buf[bytes_read - 1] == '\r') {
+                break;  // We found \r\n terminator
+            }
+            break;  // We found \n terminator
+        }
+
+        // Avoid buffer overflow
+        bytes_read++;
         if (bytes_read >= sizeof(read_buf) - 1) {
             ESP_LOGE(LOG_TAG, "Couldn't read NMEA sentence from GPS");
             return ESP_ERR_NO_MEM;
@@ -80,9 +94,9 @@ esp_err_t gt_u7_get_location(gt_u7_data_t* gt_u7_data_ret) {
     while (nmea_data == NULL || nmea_data->type != NMEA_GPGLL) {
         nmea_free(nmea_data);
         ESP_RETURN_ON_ERROR(read_next_nmea_sentence(), LOG_TAG, "Couldn't read NMEA sentence");
+        ESP_LOG_BUFFER_CHAR(LOG_TAG, read_buf, strlen(read_buf));
         nmea_data = nmea_parse(read_buf, strlen(read_buf), 1);
         ESP_RETURN_ON_FALSE(nmea_data, ESP_FAIL, LOG_TAG, "Couldn't parse NMEA sentence");
-
     }
 
     nmea_gpgll_s* gpgll_data = (nmea_gpgll_s *) nmea_data;
@@ -94,7 +108,7 @@ esp_err_t gt_u7_get_location(gt_u7_data_t* gt_u7_data_ret) {
     } else if (gpgll_data->latitude.cardinal == 'N') {
         gt_u7_data_ret->gps_latitude *= 1;
     } else {
-        ESP_LOGE(LOG_TAG, "Couldn't read latitude from GPS");
+        ESP_LOGE(LOG_TAG, "Couldn't read latitude: %02X", gpgll_data->latitude.cardinal);
         return ESP_FAIL;
     }
 

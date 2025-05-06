@@ -40,10 +40,9 @@ sx126x_hal_status_t sx126x_hal_init(void) {
         .sclk_io_num = PIN_NUM_CLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = 0,
     };
 
-    ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_DISABLED);
+    ret = spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init SPI bus: %s", esp_err_to_name(ret));
         return SX126X_HAL_STATUS_ERROR;
@@ -56,7 +55,7 @@ sx126x_hal_status_t sx126x_hal_init(void) {
         .queue_size = 1,
     };
 
-    ret = spi_bus_add_device(SPI2_HOST, &devcfg, &spi_handle);
+    ret = spi_bus_add_device(SPI3_HOST, &devcfg, &spi_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add SPI device: %s", esp_err_to_name(ret));
         return SX126X_HAL_STATUS_ERROR;
@@ -66,8 +65,14 @@ sx126x_hal_status_t sx126x_hal_init(void) {
 }
 
 static void wait_while_busy(void) {
+    uint32_t counter = 0;
     while (gpio_get_level(PIN_NUM_BUSY) == 1) {
-        // tight loop, consider adding vTaskDelay if needed
+        vTaskDelay(pdMS_TO_TICKS(1));
+        counter += 1;
+        if (counter > 10000) {
+            ESP_LOGE(TAG, "Busy line stuck high!");
+            break;
+        }
     }
 }
 
@@ -75,17 +80,15 @@ sx126x_hal_status_t sx126x_hal_write(const void* context, const uint8_t* command
                                      const uint8_t* data, const uint16_t data_length) {
     wait_while_busy();
 
-    spi_transaction_t trans = {
-        .flags = SPI_TRANS_USE_TXDATA,
-        .length = (command_length + data_length) * 8,
-        .tx_buffer = NULL,
-        .rx_buffer = NULL,
-    };
-
     uint8_t buffer[command_length + data_length];
     memcpy(buffer, command, command_length);
     memcpy(buffer + command_length, data, data_length);
-    trans.tx_buffer = buffer;
+
+    spi_transaction_t trans = {
+        .length = (command_length + data_length) * 8,  // total bits
+        .tx_buffer = buffer,
+        .rx_buffer = NULL,  // no need to read back
+    };
 
     esp_err_t ret = spi_device_transmit(spi_handle, &trans);
     if (ret != ESP_OK) {
@@ -100,32 +103,24 @@ sx126x_hal_status_t sx126x_hal_read(const void* context, const uint8_t* command,
                                     uint8_t* data, const uint16_t data_length) {
     wait_while_busy();
 
-    spi_transaction_t cmd_trans = {
-        .flags = 0,
-        .length = command_length * 8,
-        .tx_buffer = command,
-        .rx_buffer = NULL,
-    };
-    spi_transaction_t data_trans = {
-        .flags = 0,
-        .length = data_length * 8,
-        .tx_buffer = NULL,
-        .rx_buffer = data,
+    uint8_t tx_buf[command_length + data_length];
+    uint8_t rx_buf[command_length + data_length];
+    memcpy(tx_buf, command, command_length);
+    memset(tx_buf + command_length, 0x00, data_length);  // send dummy bytes to read back data
+
+    spi_transaction_t trans = {
+        .length = (command_length + data_length) * 8,  // total bits
+        .tx_buffer = tx_buf,
+        .rx_buffer = rx_buf,
     };
 
-    esp_err_t ret = spi_device_transmit(spi_handle, &cmd_trans);
+    esp_err_t ret = spi_device_transmit(spi_handle, &trans);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "SPI read (cmd) failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "SPI read failed: %s", esp_err_to_name(ret));
         return SX126X_HAL_STATUS_ERROR;
     }
 
-    wait_while_busy();
-
-    ret = spi_device_transmit(spi_handle, &data_trans);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "SPI read (data) failed: %s", esp_err_to_name(ret));
-        return SX126X_HAL_STATUS_ERROR;
-    }
+    memcpy(data, rx_buf + command_length, data_length);  // skip echoed command part
 
     return SX126X_HAL_STATUS_OK;
 }

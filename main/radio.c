@@ -6,6 +6,7 @@
 #include <esp_check.h>
 #include <string.h>
 #include <sx126x.h>
+#include <driver/gpio.h>
 
 #define LOG_TAG "radio"
 
@@ -14,11 +15,12 @@
 // TODO: How high does this go?
 #define TX_OUTPUT_POWER     22
 #define LORA_BANDWIDTH      SX126X_LORA_BW_125
-#define LORA_SPREADING_FACTOR SX126X_LORA_SF12
+#define LORA_SPREADING_FACTOR SX126X_LORA_SF5 // TODO: Increase for reliability?
 #define LORA_CODINGRATE     SX126X_LORA_CR_4_8
 #define LORA_PREAMBLE_LENGTH 12
 #define LORA_RAMP_TIME SX126X_RAMP_200_US
 #define LORA_PAYLOAD_MAX_LEN 255
+#define LORA_DIO1_GPIO GPIO_NUM_14
 
 static const void* context = NULL;
 
@@ -26,6 +28,16 @@ extern sx126x_hal_status_t sx126x_hal_init(void);
 
 esp_err_t radio_init(void) {
     sx126x_status_t status;
+
+    // Configure DIO1 GPIO as input
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << LORA_DIO1_GPIO),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io_conf);
 
     // Set up SPI
     status = sx126x_hal_init();
@@ -45,7 +57,7 @@ esp_err_t radio_init(void) {
     status = sx126x_set_pkt_type(context, SX126X_PKT_TYPE_LORA);
     ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio init fail");
     
-    status = sx126x_set_lora_sync_word(context, 0xA4);
+    status = sx126x_set_lora_sync_word(context, 0x34);
     ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio init fail");
     
     status = sx126x_set_rf_freq(context, RF_FREQUENCY);
@@ -81,29 +93,43 @@ esp_err_t radio_transmit(const uint8_t* data, uint8_t len) {
 
     // Write payload to radio buffer
     status = sx126x_write_buffer(context, 0x00, data, len);
-    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio transmit fail");
+    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio write fail");
 
-    // Set the IRQs
-    status = sx126x_set_dio_irq_params(context, SX126X_IRQ_TX_DONE, SX126X_IRQ_TX_DONE, SX126X_IRQ_NONE, SX126X_IRQ_NONE);
-    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio transmit fail");
+    // Set IRQ to raise TX_DONE on DIO1
+    status = sx126x_set_dio_irq_params(context,
+        SX126X_IRQ_TX_DONE,   // Which IRQs to enable
+        SX126X_IRQ_TX_DONE,   // Map TX_DONE to DIO1
+        SX126X_IRQ_NONE,      // No DIO2
+        SX126X_IRQ_NONE);     // No DIO3
+    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "IRQ setup fail");
 
-    // Tell the radio to transmit
-    status = sx126x_set_tx(context, 0);  // 0 = transmit immediately with no timeout
-    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio transmit fail");
+    // Start transmission
+    status = sx126x_set_tx(context, 0);  // 0 = no timeout
+    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio TX fail");
 
-    // Wait for TX to complete
-    sx126x_irq_mask_t irq_status;
-    do {
-        status = sx126x_get_irq_status(context, &irq_status);
-        ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio transmit fail");
+    // Wait for DIO1 to go high
+    ESP_LOGI(LOG_TAG, "Waiting for TX_DONE on DIO1...");
+    while (gpio_get_level(LORA_DIO1_GPIO) == 0) {
         vTaskDelay(pdMS_TO_TICKS(10));
-    } while ((irq_status & SX126X_IRQ_TX_DONE) == 0);
+        ESP_LOGI(LOG_TAG, "Peak brilliance");
+    }
+    
+
+    // Once DIO1 high, clear IRQ flags
+    sx126x_irq_mask_t irq_status;
+    status = sx126x_get_irq_status(context, &irq_status);
+    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Get IRQ fail");
 
     status = sx126x_clear_irq_status(context, SX126X_IRQ_ALL);
-    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio transmit fail");
+    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Clear IRQ fail");
 
-    ESP_LOGI(LOG_TAG, "LoRa TX complete: %.*s", len, data);
-    return ESP_OK;
+    if (irq_status & SX126X_IRQ_TX_DONE) {
+        ESP_LOGI(LOG_TAG, "LoRa TX complete: %.*s", len, data);
+        return ESP_OK;
+    } else {
+        ESP_LOGW(LOG_TAG, "Unexpected IRQ status: 0x%X", irq_status);
+        return ESP_FAIL;
+    }
 }
 
 esp_err_t radio_receive(uint8_t* buffer, uint8_t* len_out) {
@@ -137,14 +163,11 @@ esp_err_t radio_receive(uint8_t* buffer, uint8_t* len_out) {
 
     sx126x_rx_buffer_status_t rx_status;
     status = sx126x_get_rx_buffer_status(context, &rx_status);
-    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio transmit fail");
+    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio receive fail");
     
     *len_out = rx_status.pld_len_in_bytes;
     status = sx126x_read_buffer(context, rx_status.buffer_start_pointer, buffer, *len_out);
-    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio transmit fail");
-
-    status = sx126x_read_buffer(context, rx_status.buffer_start_pointer, buffer, *len_out);
-    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio transmit fail");
+    ESP_RETURN_ON_FALSE(status == 0, ESP_FAIL, LOG_TAG, "Radio receive fail");
 
     ESP_LOGI(LOG_TAG, "LoRa RX received (%d bytes): %.*s", *len_out, *len_out, buffer);
     return ESP_OK;

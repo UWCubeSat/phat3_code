@@ -43,7 +43,7 @@ const uint8_t RESP_NAK[3] = {0xAA, 0x0F, 0x00};
 const uint8_t RESP_DATA[3] =  {0xAA, 0x0A, 0x01};
 
 // Image buffer
-static uint8_t jpeg_buf[32000];
+static uint8_t jpeg_buf[128000];
 
 
 // Sends a command to the UART, and confirm acknowledgment.
@@ -84,7 +84,7 @@ esp_err_t ucam_save_photo(char* save_dir_path) {
     // Start the driver if it hasn't been already
     if (!uart_is_driver_installed(UART_NUM_1)) {
         uart_config_t uart_config = {
-            .baud_rate = 921600,
+            .baud_rate = 115200,
             .data_bits = UART_DATA_8_BITS,
             .parity = UART_PARITY_DISABLE,
             .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
@@ -97,10 +97,14 @@ esp_err_t ucam_save_photo(char* save_dir_path) {
         ESP_RETURN_ON_ERROR(ret, LOG_TAG, "Couldn't set UART config");
         ret = uart_set_pin(UART_NUM_1, GPIO_TX, GPIO_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
         ESP_RETURN_ON_ERROR(ret, LOG_TAG, "Couldn't configure UART GPIO pins");
+        esp_log_level_set("uart", ESP_LOG_DEBUG);
     }
 
+    // Tell the camera to reset, but ignore the response.
+    send_cmd(CMD_RESET, 500);
+
     // Wake up the camera (according to documentation)
-    for (int retries = 0; retries < 60; retries++) {
+    for (int retries = 0; retries < 100; retries++) {
         ret = send_cmd(CMD_SYNC, retries + 5);
         if (ret == ESP_OK) {
             break;
@@ -121,11 +125,12 @@ esp_err_t ucam_save_photo(char* save_dir_path) {
     // initialize the camera
     ret = send_cmd(CMD_INIT, 1000);
     ESP_RETURN_ON_ERROR(ret, LOG_TAG, "No ack");
-    ret = send_cmd(CMD_PACKSIZE, 1000);
-    ESP_RETURN_ON_ERROR(ret, LOG_TAG, "No ack");
-
+    
     // Wait for the camera to adjust exposure (according to documentation)
     vTaskDelay(pdMS_TO_TICKS(2000));
+    
+    ret = send_cmd(CMD_PACKSIZE, 1000);
+    ESP_RETURN_ON_ERROR(ret, LOG_TAG, "No ack");
 
     // take the picture
     ret = send_cmd(CMD_SNAPSHOT, 1000);
@@ -141,6 +146,7 @@ esp_err_t ucam_save_photo(char* save_dir_path) {
         return ESP_FAIL;
     }
     uint32_t jpeg_size = (uint32_t) reply[3] | ((uint32_t) reply[4] << 8) | ((uint32_t) reply[5] << 16);
+    ESP_RETURN_ON_FALSE(jpeg_size <= sizeof(jpeg_buf), ESP_ERR_NO_MEM, LOG_TAG, "JPEG image too large for buffer");
 
     ret = uart_flush_input(UART_NUM_1);
     ESP_RETURN_ON_ERROR(ret, LOG_TAG, "Couldn't flush UART");
@@ -183,7 +189,7 @@ esp_err_t ucam_save_photo(char* save_dir_path) {
     // Generate a timestamped image filename
     int64_t time = esp_timer_get_time() / 1000000;
     char img_path[64];
-    res = snprintf(img_path, sizeof(img_path), "%s/img%llu.jpg", save_dir_path, time);
+    res = snprintf(img_path, sizeof(img_path), "%s/img%lld.jpg", save_dir_path, time);
     if (res == -1 || res >= sizeof(img_path)) {
         return ESP_ERR_NO_MEM;
     }
@@ -203,6 +209,7 @@ esp_err_t ucam_save_photo(char* save_dir_path) {
     res = fclose(imgfile);
     if (res != 0) {
         ESP_LOGE(LOG_TAG, "Couldn't close jpg file. %s", strerror(errno));
+        return ESP_FAIL;
     }
 
     return ESP_OK;
