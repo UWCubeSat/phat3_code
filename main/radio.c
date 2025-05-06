@@ -111,9 +111,8 @@ esp_err_t radio_transmit(const uint8_t* data, uint8_t len) {
     ESP_LOGI(LOG_TAG, "Waiting for TX_DONE on DIO1...");
     while (gpio_get_level(LORA_DIO1_GPIO) == 0) {
         vTaskDelay(pdMS_TO_TICKS(10));
-        ESP_LOGI(LOG_TAG, "Peak brilliance");
     }
-    
+    ESP_LOGI(LOG_TAG, "Peak brilliance");
 
     // Once DIO1 high, clear IRQ flags
     sx126x_irq_mask_t irq_status;

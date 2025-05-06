@@ -22,16 +22,25 @@ static spi_device_handle_t spi_handle;
 sx126x_hal_status_t sx126x_hal_init(void) {
     esp_err_t ret;
 
-    // Initialize GPIOs
-    gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << PIN_NUM_RST) | (1ULL << PIN_NUM_BUSY),
+    // RST as output
+    gpio_config_t io_rst = {
+        .pin_bit_mask = (1ULL << PIN_NUM_RST),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
-    gpio_config(&io_conf);
-    gpio_set_direction(PIN_NUM_BUSY, GPIO_MODE_INPUT);
+    gpio_config(&io_rst);
+
+    // BUSY as input
+    gpio_config_t io_busy = {
+        .pin_bit_mask = (1ULL << PIN_NUM_BUSY),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io_busy);
 
     // Initialize SPI
     spi_bus_config_t buscfg = {
@@ -67,7 +76,7 @@ sx126x_hal_status_t sx126x_hal_init(void) {
 static void wait_while_busy(void) {
     uint32_t counter = 0;
     while (gpio_get_level(PIN_NUM_BUSY) == 1) {
-        vTaskDelay(pdMS_TO_TICKS(1));
+        vTaskDelay(pdMS_TO_TICKS(10));
         counter += 1;
         if (counter > 10000) {
             ESP_LOGE(TAG, "Busy line stuck high!");
@@ -96,6 +105,8 @@ sx126x_hal_status_t sx126x_hal_write(const void* context, const uint8_t* command
         return SX126X_HAL_STATUS_ERROR;
     }
 
+    wait_while_busy();
+
     return SX126X_HAL_STATUS_OK;
 }
 
@@ -122,6 +133,8 @@ sx126x_hal_status_t sx126x_hal_read(const void* context, const uint8_t* command,
 
     memcpy(data, rx_buf + command_length, data_length);  // skip echoed command part
 
+    wait_while_busy();
+
     return SX126X_HAL_STATUS_OK;
 }
 
@@ -129,13 +142,14 @@ sx126x_hal_status_t sx126x_hal_reset(const void* context) {
     gpio_set_level(PIN_NUM_RST, 0);
     vTaskDelay(pdMS_TO_TICKS(10));
     gpio_set_level(PIN_NUM_RST, 1);
-    vTaskDelay(pdMS_TO_TICKS(20));
+    vTaskDelay(pdMS_TO_TICKS(10));
+    wait_while_busy();
     return SX126X_HAL_STATUS_OK;
 }
 
 sx126x_hal_status_t sx126x_hal_wakeup(const void* context) {
     uint8_t wake_cmd = 0xC0;
     sx126x_hal_write(context, &wake_cmd, 1, NULL, 0);
-    vTaskDelay(pdMS_TO_TICKS(1));
+    wait_while_busy();
     return SX126X_HAL_STATUS_OK;
 }
