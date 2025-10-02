@@ -3,10 +3,9 @@ idf_component_register(
         "main.c"
         "sensors.c"
         "ucam.c"
-        "gt_u7.c"
+        "gps.c"
         "sd_card.c"
         "radio.c"
-        "sx126x_hal.c"
     INCLUDE_DIRS
         "."
 )

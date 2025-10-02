@@ -1,4 +1,4 @@
-#include <gt_u7.h>
+#include <gps.h>
 #include <driver/uart.h>
 #include <esp_err.h>
 #include <esp_timer.h>
@@ -17,7 +17,7 @@
 #include <gptxt.h>
 #include <gpgsv.h>
 
-#define LOG_TAG "gt-u7"
+#define LOG_TAG "gps7"
 
 #define UART_BUF_SIZE 1024
 
@@ -67,7 +67,7 @@ static esp_err_t read_next_nmea_sentence(void) {
     return ESP_OK;
 }
 
-esp_err_t gt_u7_get_location(gt_u7_data_t* gt_u7_data_ret) {
+esp_err_t gps_get_location(gt_u7_data_t* gt_u7_data_ret) {
     esp_err_t ret;
 
     // Start the driver if it hasn't been already

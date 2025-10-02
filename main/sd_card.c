@@ -23,7 +23,7 @@ esp_err_t sd_card_mount(char* ret_dir_path, size_t ret_dir_path_size) {
     esp_err_t ret;
 
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
-    host.slot = SPI2_HOST;
+    host.slot = SPI3_HOST;
 
     spi_bus_config_t bus_cfg = {
         .mosi_io_num = GPIO_MOSI,

@@ -1,7 +1,8 @@
 # phat3_code
 
 This Arduino code will run on the
-[Heltec ESP32 LoRA V3](https://docs.heltec.org/en/node/esp32/wifi_lora_32/index.html) (915 MHz) aboard the
+[Heltec ESP32 LoRA V3 915h MHz](https://docs.heltec.org/en/node/esp32/wifi_lora_32/index.html)
+([schematic](/documentation/heltec-v3-schematic.pdf)) aboard the
 [PHAT-3 mainboard](https://github.com/UWCubeSat/PHAT-3-Main-Board).
 It will save data from PCB-mounted sensors to a micro SD card, as well as transmitting it over LoRA.
 
@@ -9,20 +10,30 @@ Sensor purchase requests:
 - [Purchase 1](https://docs.google.com/spreadsheets/d/1dPWJqdXrCmhPzfS-cPAt9ABr9ZaCJCoQ50nD71KFVlc/edit?usp=sharing)
 - [Purchase 2](https://docs.google.com/spreadsheets/d/1_jEgsWjWWhrQImKw_u3TRmB3PyZUZdtXv6XSBbfWu6M/edit?usp=sharing)
 
+Pinout for connecting to the Heltec board:
+
 ![ESP 32 Pinout](./documentation/esp32_pinout.png)
+
+Schematic of the PHAT-3 payload:
 
 ![ESP 32 Pinout](./documentation/main-pcb-schematic.png)
 
+
 ## Libraries
-- `<Arduino.h>`
-- `<Wire.h>`
-- `<SPI.h>`
-- `<SD.h>`
+
+- See [idf_component.yml](/main/idf_component.yml) for dependencies.
+- esp-idf-lib libraries used for aht, bmp180, mpu6050, and scd4x.
+- igrr/libnmea used for parsing GPS output.
+- nopnop2002/sx126x used for controlling built-in radio. Here is [example code](https://github.com/nopnop2002/esp-idf-sx126x/blob/main/basic/main/main.c). (TODO: This will hopefully replace the high-boilerplate driver we used to use in components/sx126x_driver).
 
 ## I2C Bus
 
 - SCL - schematic pin 11 - GPIO 41
 - SDA - schematic pin 12 - GPIO 42
+
+## Troubleshooting
+- Make sure your chip is set to "esp32s3" with `idf.py set-target esp32s3`.
+    Confirm it says "esp32s3" in the bottom bar of VSCode.
 
 ## Sensors Documentation
 
@@ -82,3 +93,13 @@ Camera
 - CLK (clock) - schematic pin 30 - GPIO 33
 - MOSI (main -> sub) - schematic pin 31 - GPIO 47
 - CS (chip select) - schematic pin 32 - GPIO 48
+
+### Built-in radio: SX1262
+- Built-in LoRa radio on the ESP board.
+- NSS - GPIO 8
+- SCK - GPIO 9
+- MOSI - GPIO 10
+- MISO - GPIO 11
+- RST - GPIO 12
+- Busy - GPIO 13
+- DIO1 - GPIO 14

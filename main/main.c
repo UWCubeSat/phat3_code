@@ -1,7 +1,7 @@
 // Our headers
 #include <sensors.h>
 #include <ucam.h>
-#include <gt_u7.h>
+#include <gps.h>
 #include <sd_card.h>
 #include <radio.h>
 
@@ -36,7 +36,7 @@ static void sensor_task(void* pvParameters) {
 
         ESP_LOGI(LOG_TAG, "Before");
         
-        err = radio_transmit((uint8_t*) &sensors_data, sizeof(sensors_data));
+        err = radio_send((uint8_t*) &sensors_data, sizeof(sensors_data));
         ESP_ERROR_CHECK_WITHOUT_ABORT(err);
 
         ESP_LOGI(LOG_TAG, "After");

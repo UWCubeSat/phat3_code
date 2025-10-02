@@ -1,14 +1,12 @@
 #pragma once
-#include <sx126x_hal.h>
 
+#include <stdint.h>
 #include <esp_err.h>
 
+// TODO
 
-// Initialize the radio
 esp_err_t radio_init(void);
 
-// Transmit `data`
-esp_err_t radio_transmit(const uint8_t* data, uint8_t len);
+esp_err_t radio_send(uint8_t *data, int16_t len);
 
-// Fills `buffer` with the next packet
-esp_err_t radio_receive(uint8_t* buffer, uint8_t* len_out);
+uint8_t radio_receive(uint8_t *data, int16_t len);

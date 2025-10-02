@@ -9,4 +9,4 @@ typedef struct {
 } gt_u7_data_t;
 
 // Gets the current location from the GT-U7 GPS.
-esp_err_t gt_u7_get_location(gt_u7_data_t* gt_u7_data_ret);
+esp_err_t gps_get_location(gt_u7_data_t* gt_u7_data_ret);

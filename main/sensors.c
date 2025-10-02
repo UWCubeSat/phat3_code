@@ -10,7 +10,7 @@
 #include <mpu6050.h>
 #include <scd4x.h>
 
-#include <gt_u7.h>
+#include <gps.h>
 
 // Tag used for logging
 #define LOG_TAG "sensors"
@@ -134,7 +134,7 @@ esp_err_t sensors_read(sensors_data_t* sensor_data_ret) {
     // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
 
     // gt_u7_data_t gps_data;
-    // err = gt_u7_get_location(&gps_data);
+    // err = gps_get_location(&gps_data);
     // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
     // sensor_data_ret->gps_latitude = gps_data.gps_latitude;
     // sensor_data_ret->gps_longitude = gps_data.gps_longitude;
