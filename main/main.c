@@ -34,6 +34,8 @@ static void sensor_task(void* pvParameters) {
         err = sensors_save_to_csv(&sensors_data, sensor_csv_path);
         ESP_ERROR_CHECK_WITHOUT_ABORT(err);
 
+        sensors_log_data(&sensors_data);
+
         ESP_LOGI(LOG_TAG, "Before");
         
         err = radio_send((uint8_t*) &sensors_data, sizeof(sensors_data));
@@ -58,8 +60,7 @@ static void camera_task(void* pvParameters) {
     }
 }
 
-void app_main(void) {
-    // Create files on SD card
+static void init_save_paths(void) {
     int res;
     char sd_path[64];
     ESP_ERROR_CHECK(sd_card_mount(sd_path, sizeof(sd_path)));
@@ -79,7 +80,12 @@ void app_main(void) {
         ESP_LOGE(LOG_TAG, "Couldn't create photo directory");
         abort();
     }
+}
 
+void app_main(void) {
+    // Create files on SD card
+
+    init_save_paths();
     ESP_ERROR_CHECK(sensors_init());
     ESP_ERROR_CHECK(radio_init());
     

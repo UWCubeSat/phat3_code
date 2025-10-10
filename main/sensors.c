@@ -32,44 +32,28 @@ static char csv_line_buf[2048];
 esp_err_t sensors_init(void) {
     esp_err_t err;
 
-    // // Initialize the I2C driver
-    // i2c_config_t i2c_conf = {
-    //     .mode = I2C_MODE_MASTER,
-    //     .sda_io_num = SDA,
-    //     .scl_io_num = SCL,
-    //     .sda_pullup_en = GPIO_PULLUP_ENABLE,
-    //     .scl_pullup_en = GPIO_PULLUP_ENABLE,
-    //     .master.clk_speed = 10 * 1000,
-    //     .clk_flags = 0,  // use default
-    // };
-
-    // err = i2c_param_config(I2C_PORT, &i2c_conf);
-    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init I2C driver");
-
-    // err = i2c_driver_install(I2C_PORT, i2c_conf.mode, 0, 0, 0);
-    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init I2C driver");
-
     err = i2cdev_init();
-    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init I2C library");
+    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init esp-idf-lib library");
 
     // Initialize the sensors
 
+    // AHT21
     err = aht_init_desc(&aht_dev, AHT_I2C_ADDRESS_GND, I2C_PORT, SDA, SCL);
     ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
     err = aht_init(&aht_dev);
     ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
-    
     bool is_busy, is_calibrated;
     err = aht_get_status(&aht_dev, &is_busy, &is_calibrated);
     ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
     ESP_RETURN_ON_FALSE(is_busy == false, ESP_FAIL, LOG_TAG, "Couldn't init sensor");
 
+    // GY-68 BMP180
     err = bmp180_init_desc(&bmp180_dev, I2C_PORT, SDA, SCL);
     ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
     err = bmp180_init(&bmp180_dev);
     ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
 
-
+    // GY-521 MPU-6050
     err = mpu6050_init_desc(&mpu6050_dev, MPU6050_I2C_ADDRESS_LOW, I2C_PORT, SDA, SCL);
     ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
     err = mpu6050_init(&mpu6050_dev);
@@ -79,12 +63,20 @@ esp_err_t sensors_init(void) {
 
     // TODO: Get the CO2 sensor to work below.
 
-    // err = scd4x_init_desc(&scd41_dev, I2C_PORT, SDA, SCL);
-    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
-    // vTaskDelay(pdMS_TO_TICKS(1000)); // TODO: is this needed?
-    // err = scd4x_start_periodic_measurement(&scd41_dev);
-    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init sensor");
-    // // TODO: calibrate?
+    // SCD41
+    err = scd4x_init_desc(&scd41_dev, I2C_PORT, SDA, SCL);
+    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init SCD41");
+    err = scd4x_wake_up(&scd41_dev);
+    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init SCD41");
+    err = scd4x_stop_periodic_measurement(&scd41_dev);
+    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init SCD41");
+    err = scd4x_reinit(&scd41_dev);
+    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init SCD41");
+    err = scd4x_start_periodic_measurement(&scd41_dev);
+    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't init SCD41");
+
+
+    // // TODO: calibrate the sensors?
 
     return ESP_OK;
 }
@@ -125,24 +117,25 @@ esp_err_t sensors_read(sensors_data_t* sensor_data_ret) {
     sensor_data_ret->mpu6050_rot_y = mpu6050_rot.y;
     sensor_data_ret->mpu6050_rot_z = mpu6050_rot.z;
 
-    // err = scd4x_read_measurement(
-    //     &scd41_dev,
-    //     &(sensor_data_ret->scd41_co2),
-    //     &(sensor_data_ret->scd41_temperature),
-    //     &(sensor_data_ret->scd41_humidity)
-    // );
-    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
+    err = scd4x_read_measurement(
+        &scd41_dev,
+        &(sensor_data_ret->scd41_co2),
+        &(sensor_data_ret->scd41_temperature),
+        &(sensor_data_ret->scd41_humidity)
+    );
+    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
+    // TODO: Handle the 5 second NACK interval.
 
-    // gt_u7_data_t gps_data;
-    // err = gps_get_location(&gps_data);
-    // ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
-    // sensor_data_ret->gps_latitude = gps_data.gps_latitude;
-    // sensor_data_ret->gps_longitude = gps_data.gps_longitude;
-    // strncpy(
-    //     sensor_data_ret->gps_timestamp,
-    //     gps_data.gps_timestamp,
-    //     sizeof(sensor_data_ret->gps_timestamp)
-    // );
+    gt_u7_data_t gps_data;
+    err = gps_get_location(&gps_data);
+    ESP_RETURN_ON_ERROR(err, LOG_TAG, "Couldn't read sensor data");
+    sensor_data_ret->gps_latitude = gps_data.gps_latitude;
+    sensor_data_ret->gps_longitude = gps_data.gps_longitude;
+    strncpy(
+        sensor_data_ret->gps_timestamp,
+        gps_data.gps_timestamp,
+        sizeof(sensor_data_ret->gps_timestamp)
+    );
 
     return ESP_OK;
 }
@@ -179,5 +172,5 @@ esp_err_t sensors_save_to_csv(const sensors_data_t* sensor_data, const char* csv
 }
 
 void sensors_log_data(const sensors_data_t* sensor_data) {
-    ESP_LOGI(LOG_TAG, PRETTY_FMT_LINE, SENSOR_DATA_EXPAND(*sensor_data));
+    printf(PRETTY_FMT_LINE, SENSOR_DATA_EXPAND(*sensor_data));
 }
