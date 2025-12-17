@@ -19,6 +19,25 @@ Schematic of the PHAT-3 payload:
 ![ESP 32 Pinout](./documentation/main-pcb-schematic.png)
 
 
+## Building
+To build this project, first configure the VSCode ESP-IDF extension. Then click the "Open ESP-IDF Terminal" widget on the bottom taskbar. Build and flash each project individually:
+```bash
+cd ./firmware_payload
+idf.py build
+idf.py flash
+cd ..
+cd ./firmware_payload
+idf.py build
+idf.py flash
+```
+
+Monitor the output using screen:
+
+```bash
+screen /dev/<PORT_PATH> 115200
+```
+
+
 ## Libraries
 
 - See [idf_component.yml](/main/idf_component.yml) for dependencies.

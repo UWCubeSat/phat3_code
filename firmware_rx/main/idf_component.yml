@@ -1,0 +1,24 @@
+## IDF Component Manager Manifest File
+dependencies:
+  ## Required IDF version
+  idf:
+    version: '>=4.1.0'
+  # # Put list of dependencies here
+  # # For components maintained by Espressif:
+  # component: "~1.0.0"
+  # # For 3rd party components:
+  # username/component: ">=1.0.0,<2.0.0"
+  # username2/component2:
+  #   version: "~1.0.0"
+  #   # For transient dependencies `public` flag can be set.
+  #   # `public` flag doesn't have an effect dependencies of the `main` component.
+  #   # All dependencies of `main` are public by default.
+  #   public: true
+  igrr/libnmea: ^0.2.1
+  esp-idf-lib/aht: ^1.0.0
+  esp-idf-lib/bmp180: ^1.0.7
+  esp-idf-lib/mpu6050: ^2.1.8
+  esp-idf-lib/scd4x: ^1.0.8
+  nopnop2002/sx126x:
+    path: components/ra01s/
+    git: https://github.com/nopnop2002/esp-idf-sx126x.git

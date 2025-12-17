@@ -1,0 +1,20 @@
+# This file was generated using idf.py save-defconfig. It can be edited manually.
+# Espressif IoT Development Framework (ESP-IDF) 5.4.0 Project Minimal Configuration
+#
+
+# The ESP chip that the Heltec uses
+CONFIG_IDF_TARGET="esp32s3"
+
+# Enable long filenames
+CONFIG_FATFS_LFN_STACK=y
+
+# Config for https://github.com/nopnop2002/esp-idf-sx126x
+CONFIG_USE_TCXO=y
+CONFIG_915MHZ=y
+CONFIG_MISO_GPIO=11
+CONFIG_SCLK_GPIO=9
+CONFIG_MOSI_GPIO=10
+CONFIG_NSS_GPIO=8
+CONFIG_RST_GPIO=12
+CONFIG_BUSY_GPIO=13
+
