@@ -129,14 +129,4 @@ esp_err_t gps_get_location(gt_u7_data_t* gt_u7_data_ret) {
     ESP_RETURN_ON_FALSE(res != 0, ESP_ERR_NO_MEM, LOG_TAG, "strftime error: %s", strerror(errno));
 
     return ESP_OK;
-
-    // printf("GPGLL Sentence\n");
-    // printf("Longitude:\n");
-    // printf("  Degrees: %d\n", gpgll->longitude.degrees);
-    // printf("  Minutes: %f\n", gpgll->longitude.minutes);
-    // printf("  Cardinal: %c\n", (char) gpgll->longitude.cardinal);
-    // printf("Latitude:\n");
-    // printf("  Degrees: %d\n", gpgll->latitude.degrees);
-    // printf("  Minutes: %f\n", gpgll->latitude.minutes);
-    // printf("  Cardinal: %c\n", (char) gpgll->latitude.cardinal);
 }

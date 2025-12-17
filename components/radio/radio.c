@@ -10,16 +10,13 @@
 
 esp_err_t radio_init(void) {
     LoRaInit();
-    printf("LoRaInit done.\n");
 
     uint32_t frequencyInHz = 915000000;
     int8_t txPowerInDbm = 22;
     float tcxoVoltage = 3.3; // use TCXO
 	bool useRegulatorLDO = true; // use DCDC + LDO
 
-    printf("Calling LoRaBegin...\n");
     int16_t ret = LoRaBegin(frequencyInHz, txPowerInDbm, tcxoVoltage, useRegulatorLDO);
-    printf("LoRaBegin done.\n");
 
     if (ret != 0) {
         ESP_LOGE(LOG_TAG, "Error on LoRaBegin");
@@ -35,7 +32,6 @@ esp_err_t radio_init(void) {
 	bool invertIrq = false;
 
     LoRaConfig(spreadingFactor, bandwidth, codingRate, preambleLength, payloadLen, crcOn, invertIrq);
-    printf("LoRaConfig done.\n");
 
     return ESP_OK;
 }
