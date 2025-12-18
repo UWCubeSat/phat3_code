@@ -63,7 +63,7 @@ static esp_err_t read_next_nmea_sentence(void) {
         }
     }
 
-    read_buf[bytes_read] = '\0';
+    read_buf[bytes_read + 1] = '\0';
     return ESP_OK;
 }
 
@@ -94,7 +94,6 @@ esp_err_t gps_get_location(gt_u7_data_t* gt_u7_data_ret) {
     while (nmea_data == NULL || nmea_data->type != NMEA_GPGLL) {
         nmea_free(nmea_data);
         ESP_RETURN_ON_ERROR(read_next_nmea_sentence(), LOG_TAG, "Couldn't read NMEA sentence");
-        ESP_LOG_BUFFER_CHAR(LOG_TAG, read_buf, strlen(read_buf));
         nmea_data = nmea_parse(read_buf, strlen(read_buf), 1);
         ESP_RETURN_ON_FALSE(nmea_data, ESP_FAIL, LOG_TAG, "Couldn't parse NMEA sentence");
     }
