@@ -37,6 +37,14 @@ Monitor the output using screen:
 screen /dev/<PORT_PATH> 115200
 ```
 
+## Logging
+
+After connecting the receiver, start logging by running:
+
+```bash
+python3 rx_logger.py -p <PORT> -f <CSV_FILE_LOCATION>
+```
+
 
 ## Libraries
 
