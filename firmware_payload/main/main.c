@@ -43,7 +43,6 @@ static void sensor_task(void* pvParameters) {
     }
 }
 
-// TODO: incorporate this task into app_main
 static void camera_task(void* pvParameters) {
     esp_err_t err;
     TickType_t last_wake_time = xTaskGetTickCount();
@@ -88,6 +87,7 @@ void app_main(void) {
     
     // Spawn threads
     xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 2, NULL);
+    xTaskCreate(camera_task, "camera_task", 4096, NULL, 2, NULL);
     
     ESP_LOGI(LOG_TAG, "System start successful.");
 }
