@@ -43,7 +43,8 @@ const uint8_t RESP_NAK[3] = {0xAA, 0x0F, 0x00};
 const uint8_t RESP_DATA[3] =  {0xAA, 0x0A, 0x01};
 
 // Image buffer
-static uint8_t jpeg_buf[128000];
+static uint8_t jpeg_buf[72000];
+static uint32_t jpeg_size = 0;
 
 
 // Sends a command to the UART, and confirm acknowledgment.
@@ -145,7 +146,7 @@ esp_err_t ucam_save_photo(char* save_dir_path) {
     if (memcmp(reply, RESP_DATA, sizeof(RESP_DATA)) != 0) {
         return ESP_FAIL;
     }
-    uint32_t jpeg_size = (uint32_t) reply[3] | ((uint32_t) reply[4] << 8) | ((uint32_t) reply[5] << 16);
+    jpeg_size = (uint32_t) reply[3] | ((uint32_t) reply[4] << 8) | ((uint32_t) reply[5] << 16);
     ESP_RETURN_ON_FALSE(jpeg_size <= sizeof(jpeg_buf), ESP_ERR_NO_MEM, LOG_TAG, "JPEG image too large for buffer");
 
     ret = uart_flush_input(UART_NUM_1);
@@ -212,5 +213,15 @@ esp_err_t ucam_save_photo(char* save_dir_path) {
         return ESP_FAIL;
     }
 
+    return ESP_OK;
+}
+
+
+esp_err_t ucam_get_last_saved_photo(uint8_t** jpeg_buf_out, uint32_t* jpeg_size_out) {
+    if (jpeg_size == 0) {
+        return ESP_FAIL;
+    }
+    *jpeg_buf_out = jpeg_buf;
+    *jpeg_size_out = jpeg_size;
     return ESP_OK;
 }

@@ -1,6 +1,7 @@
 import serial
 import csv
 import time
+import base64
 import argparse
 
 # Arguments
@@ -62,6 +63,14 @@ def run_logger():
                             print(f"[DATA] Saved: {data_values[0]} | GPS: {data_values[-1]}")
                         else:
                             print(f"[WARN] Column mismatch. Got {len(data_values)}, expected {len(CSV_HEADERS)}")
+                    
+                    elif line.startswith('JPEG_PKT;'):
+                        parts = line.split(';', 2)
+                        size = int(parts[1])
+                        jpeg_data = base64.b64decode(parts[2])
+                        
+                        with open(f'image_{int(time.time())}.jpg', 'wb') as img_f:
+                            img_f.write(jpeg_data)
                             
                     else:
                         print(f"[ESP32] {line}")

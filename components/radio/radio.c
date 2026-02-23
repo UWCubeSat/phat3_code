@@ -24,7 +24,7 @@ esp_err_t radio_init(void) {
     }
 
     uint8_t spreadingFactor = 7;
-	uint8_t bandwidth = 4;
+	uint8_t bandwidth = 6;
 	uint8_t codingRate = 1;
 	uint16_t preambleLength = 8;
 	uint8_t payloadLen = 0;
