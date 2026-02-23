@@ -26,7 +26,7 @@ cd ./firmware_payload
 idf.py build
 idf.py flash
 cd ..
-cd ./firmware_payload
+cd ./firmware_rx
 idf.py build
 idf.py flash
 ```
