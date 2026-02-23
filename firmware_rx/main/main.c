@@ -51,6 +51,12 @@ typedef struct {
     };
 } packet_t;
 
+typedef struct {
+    int8_t rssi;
+    int8_t snr;
+    packet_t pkt;
+} packet_meta_t;
+
 
 static uint8_t b64_buf[MAX_B64_BUF_SIZE];
 static uint8_t jpeg_shards_buf[MAX_TOTAL_SHARDS * JPEG_SHARD_SIZE];
@@ -127,21 +133,23 @@ static int decode_group(reed_solomon *rs, int group_idx, int block_size) {
 }
 
 static void radio_receive_task(void* pvParameters) {
-    uint8_t bytes;
-    packet_t curr;
-
     while (true) {
-        bytes = radio_receive((uint8_t*) &curr, sizeof(curr));
+        uint8_t bytes;
+        packet_meta_t curr;
+        int8_t rssi, snr;
+        bytes = radio_receive((uint8_t*) &curr.pkt, sizeof(curr.pkt), &rssi, &snr);
         if (bytes == 0) {
             vTaskDelay(pdMS_TO_TICKS(1));
             continue;
         }
-        if (bytes != sizeof(curr)) {
+        if (bytes != sizeof(curr.pkt)) {
             ESP_LOGW(LOG_TAG, "Corrupted radio packet: expected %d bytes, got %d",
-                sizeof(curr), bytes);
+                sizeof(curr.pkt), bytes);
             vTaskDelay(pdMS_TO_TICKS(1));
             continue;
         }
+        curr.rssi = rssi;
+        curr.snr = snr;
         if (xQueueSend(packet_queue, &curr, 0) != pdTRUE) {
             ESP_LOGW(LOG_TAG, "Packet queue full, dropping packet");
         }
@@ -150,8 +158,6 @@ static void radio_receive_task(void* pvParameters) {
 }
 
 static void packet_process_task(void* pvParameters) {
-    packet_t curr;
-
     fec_init();
     reed_solomon *rs = reed_solomon_new(DATA_SHARDS, PARITY_SHARDS);
     if (rs == NULL) {
@@ -161,38 +167,40 @@ static void packet_process_task(void* pvParameters) {
     }
 
     while (true) {
+        packet_meta_t curr;
         // Block until a packet is available
         if (xQueueReceive(packet_queue, &curr, portMAX_DELAY) != pdTRUE) {
             continue;
         }
+        ESP_LOGW(LOG_TAG, "Packet rssi: %d, snr: %d", curr.rssi, curr.snr);
 
-        switch (curr.header) {
+        switch (curr.pkt.header) {
             case JPEG_PKT: {
                 // First shard of a new image - reset state
-                if (curr.photo_id != curr_photo_id) {
+                if (curr.pkt.photo_id != curr_photo_id) {
                     reset_jpeg_reception();
-                    curr_photo_id = curr.photo_id;
-                    original_data_size = curr.data_size;
+                    curr_photo_id = curr.pkt.photo_id;
+                    original_data_size = curr.pkt.data_size;
                     expected_shard_count = calculate_total_shards(rs, original_data_size, JPEG_SHARD_SIZE);
                     ESP_LOGI(LOG_TAG, "Starting new JPEG reception: %lu bytes, %lu shards, %u id",
                              (unsigned long)original_data_size, (unsigned long)expected_shard_count, (unsigned)curr_photo_id);
                 }
                 
                 // Validate shard index
-                if (curr.shard_idx >= expected_shard_count) {
+                if (curr.pkt.shard_idx >= expected_shard_count) {
                     ESP_LOGW(LOG_TAG, "Invalid shard index: %lu >= %lu",
-                             (unsigned long)curr.shard_idx, (unsigned long)expected_shard_count);
+                             (unsigned long)curr.pkt.shard_idx, (unsigned long)expected_shard_count);
                     break;
                 }
 
                 // Store shard if not already received
-                if (!shards_received[curr.shard_idx]) {
-                    memcpy(jpeg_shards_buf + curr.shard_idx * JPEG_SHARD_SIZE, curr.jpeg_shard, JPEG_SHARD_SIZE);
-                    shards_received[curr.shard_idx] = true;
+                if (!shards_received[curr.pkt.shard_idx]) {
+                    memcpy(jpeg_shards_buf + curr.pkt.shard_idx * JPEG_SHARD_SIZE, curr.pkt.jpeg_shard, JPEG_SHARD_SIZE);
+                    shards_received[curr.pkt.shard_idx] = true;
                     received_shard_count++;
                 }
                 ESP_LOGI(LOG_TAG, "Received shard %lu/%lu",
-                         (unsigned long)curr.shard_idx, (unsigned long)expected_shard_count);
+                         (unsigned long)curr.pkt.shard_idx, (unsigned long)expected_shard_count);
 
                 if (!sent_serial_jpeg) {
                     int nr_groups = expected_shard_count / (DATA_SHARDS + PARITY_SHARDS);
@@ -200,12 +208,12 @@ static void packet_process_task(void* pvParameters) {
 
                     // Correctly determine group_idx for both data and parity shards
                     int group_idx;
-                    if (curr.shard_idx < nr_data_shards_total) {
+                    if (curr.pkt.shard_idx < nr_data_shards_total) {
                         // Data shard
-                        group_idx = curr.shard_idx / DATA_SHARDS;
+                        group_idx = curr.pkt.shard_idx / DATA_SHARDS;
                     } else {
                         // Parity shard
-                        group_idx = (curr.shard_idx - nr_data_shards_total) / PARITY_SHARDS;
+                        group_idx = (curr.pkt.shard_idx - nr_data_shards_total) / PARITY_SHARDS;
                     }
 
                     if (group_idx < nr_groups && !groups_decoded[group_idx]) {
@@ -232,10 +240,10 @@ static void packet_process_task(void* pvParameters) {
                 break;
             }
             case SENSOR_PKT:
-                sensors_log_data_compact(&curr.sensor_data);
+                sensors_log_data_compact(&curr.pkt.sensor_data);
                 break;
             default:
-                ESP_LOGW(LOG_TAG, "Corrupted radio packet: got %d header", curr.header);
+                ESP_LOGW(LOG_TAG, "Corrupted radio packet: got %d header", curr.pkt.header);
         }
 
         vTaskDelay(pdMS_TO_TICKS(1));
@@ -245,7 +253,7 @@ static void packet_process_task(void* pvParameters) {
 void app_main(void) {
     ESP_ERROR_CHECK(radio_init());
     
-    packet_queue = xQueueCreate(10, sizeof(packet_t));
+    packet_queue = xQueueCreate(10, sizeof(packet_meta_t));
 
     // Spawn threads
     xTaskCreate(radio_receive_task, "radio_receive_task", 4096, NULL, 3, NULL);
