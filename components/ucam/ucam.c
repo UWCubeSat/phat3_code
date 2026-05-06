@@ -76,8 +76,7 @@ static esp_err_t send_cmd(const uint8_t cmd[6], uint32_t ms_timeout) {
     }
 }
 
-
-esp_err_t ucam_save_photo(char* save_dir_path) {
+esp_err_t ucam_take_photo(void) {
     esp_err_t ret;
     int res;
     uint8_t reply[6];
@@ -195,6 +194,11 @@ esp_err_t ucam_save_photo(char* save_dir_path) {
         return ESP_ERR_NO_MEM;
     }
 
+    return ESP_OK;
+}
+
+
+esp_err_t ucam_save_photo(char* save_dir_path) {
     // Save the image
     FILE* imgfile = fopen(img_path, "w");
     if (imgfile == NULL) {

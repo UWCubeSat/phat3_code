@@ -1,7 +1,10 @@
 #pragma once
 #include <esp_err.h>
 
-// Save a jpeg photo from the UCAM-III
+// Store ucam photo in buffer
+esp_err_t ucam_take_photo(void);
+
+// Save the most recent jpeg photo from the UCAM-III
 // to the given directory.
 esp_err_t ucam_save_photo(char* save_dir_path);
 

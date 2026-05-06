@@ -16,6 +16,10 @@
 #include <unistd.h>
 #include <esp_task.h>
 
+// FreeRTOS headers
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+
 // Tag used for logging
 #define LOG_TAG "main"
 // Size of each shard
@@ -55,6 +59,9 @@ static char photo_dir[64];
 static char sensor_csv_path[64];
 static sensors_data_t sensors_data;
 static bool sensors_ready;
+
+// Serialize SD card / filesystem access across tasks.
+static SemaphoreHandle_t sd_card_mutex = NULL;
 
 static int update_encoding(reed_solomon *rs, unsigned char *data, int data_size, int block_size) {
     int rs_data_shards = rs->data_shards;
@@ -100,8 +107,13 @@ static void sensor_task(void* pvParameters) {
         err = sensors_read(&sensors_data);
         ESP_ERROR_CHECK_WITHOUT_ABORT(err);
         
-        err = sensors_save_to_csv(&sensors_data, sensor_csv_path);
-        ESP_ERROR_CHECK_WITHOUT_ABORT(err);
+        if (xSemaphoreTake(sd_card_mutex, pdMS_TO_TICKS(2000)) != pdTRUE) {
+            ESP_LOGE(LOG_TAG, "Timed out waiting for SD card mutex (sensor CSV write)");
+        } else {
+            err = sensors_save_to_csv(&sensors_data, sensor_csv_path);
+            xSemaphoreGive(sd_card_mutex);
+            ESP_ERROR_CHECK_WITHOUT_ABORT(err);
+        }
 
         sensors_log_data(&sensors_data);
         sensors_ready = true;
@@ -125,8 +137,16 @@ static void camera_task(void* pvParameters) {
     
     while (true) {
         ESP_LOGI(LOG_TAG, "Taking photo");
-        err = ucam_save_photo(photo_dir);
+        err = ucam_take_photo();
         ESP_ERROR_CHECK_WITHOUT_ABORT(err);
+
+        if (xSemaphoreTake(sd_card_mutex, pdMS_TO_TICKS(10000)) != pdTRUE) {
+            ESP_LOGE(LOG_TAG, "Timed out waiting for SD card mutex (photo save)");
+        } else {
+            err = ucam_save_photo(photo_dir);
+            xSemaphoreGive(sd_card_mutex);
+            ESP_ERROR_CHECK_WITHOUT_ABORT(err);
+        }
 
         // If the last image has finished transmitting
         if (curr_shard >= shard_count || shard_count == 0) {
@@ -212,6 +232,12 @@ static void init_save_paths(void) {
 
 void app_main(void) {
     // Create files on SD card
+
+    sd_card_mutex = xSemaphoreCreateMutex();
+    if (sd_card_mutex == NULL) {
+        ESP_LOGE(LOG_TAG, "Failed to create SD card mutex");
+        abort();
+    }
 
     init_save_paths();
     ESP_ERROR_CHECK(sensors_init());
