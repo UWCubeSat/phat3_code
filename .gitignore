@@ -6,3 +6,5 @@ sdkconfig.old
 dependencies.lock
 managed_components/
 .DS_Store
+*.jpg
+*.csv

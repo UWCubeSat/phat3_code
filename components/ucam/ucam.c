@@ -186,6 +186,13 @@ esp_err_t ucam_take_photo(void) {
 
     ESP_RETURN_ON_FALSE(bytes_read == jpeg_size, ESP_FAIL, LOG_TAG, "Read unexpected image size");
 
+    return ESP_OK;
+}
+
+
+esp_err_t ucam_save_photo(char* save_dir_path) {
+    int res;
+
     // Generate a timestamped image filename
     int64_t time = esp_timer_get_time() / 1000000;
     char img_path[64];
@@ -194,11 +201,6 @@ esp_err_t ucam_take_photo(void) {
         return ESP_ERR_NO_MEM;
     }
 
-    return ESP_OK;
-}
-
-
-esp_err_t ucam_save_photo(char* save_dir_path) {
     // Save the image
     FILE* imgfile = fopen(img_path, "w");
     if (imgfile == NULL) {
