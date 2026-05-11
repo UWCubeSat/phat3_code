@@ -204,7 +204,7 @@ static void radio_task(void* pvParameters) {
             ESP_ERROR_CHECK_WITHOUT_ABORT(err);
         }
         
-        xTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(150)); 
+        xTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(210)); 
     }
 }
 
